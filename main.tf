@@ -42,5 +42,5 @@ resource "aws_lambda_function" "lambda_test" {
   # Use S3 for the Lambda code
   s3_bucket = "lambda-artifacts-ziad"           # bucket name
   s3_key    = "lambda/lambda.zip"               # path to object in S3
-  
+  5
 }
