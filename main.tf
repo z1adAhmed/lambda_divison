@@ -39,6 +39,8 @@ resource "aws_lambda_function" "lambda_test" {
     security_group_ids = ["sg-0c53e2bc1c2751d0f"]
   }
 
-  filename         = "lambda.zip"
-  source_code_hash = filebase64sha256("lambda.zip")
+  # Use S3 for the Lambda code
+  s3_bucket = "lambda-artifacts-ziad"           # bucket name
+  s3_key    = "lambda/lambda.zip"               # path to object in S3
+  
 }
