@@ -1,7 +1,7 @@
 terraform {
   backend "s3" {
     bucket = "ziad-infraterraform-state-simple"
-    key    = "lambda-prod/terraform.tfstate"   # different key for prod
+    key    = "lambda/terraform.tfstate"   # different key for prod
     region = "eu-west-1"
   }
 
