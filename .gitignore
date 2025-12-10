@@ -4,3 +4,10 @@
 /test/*.tfstate.backup
 /test/.terraform.lock.hcl
 /test/crash.log
+
+# Ignore all Terraform state, lock files, and crash logs in the prod directory
+/prod/.terraform/
+/prod/*.tfstate
+/prod/*.tfstate.backup
+/prod/.terraform.lock.hcl
+/prod/crash.log
