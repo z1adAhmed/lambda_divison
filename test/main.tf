@@ -15,6 +15,11 @@ data "terraform_remote_state" "vpc" {
 ########################################
 # Lambda 1 (Test VPC)
 ########################################
+data "aws_s3_bucket_object" "lambda1_code" {
+  bucket = "lambda-artifacts-ziad"
+  key    = "lambda/lambda1.zip"
+}
+
 resource "aws_lambda_function" "lambda1_test" {
   function_name = "lambda1-test"
   runtime       = "python3.13"
@@ -42,13 +47,19 @@ resource "aws_lambda_function" "lambda1_test" {
     security_group_ids = [data.terraform_remote_state.vpc.outputs.test_lambda_sg_id]
   }
 
-  filename         = "${path.module}/lambdas/lambda1.zip"
-  source_code_hash = filebase64sha256("${path.module}/lambdas/lambda1.zip")
+  s3_bucket        = data.aws_s3_bucket_object.lambda1_code.bucket
+  s3_key           = data.aws_s3_bucket_object.lambda1_code.key
+  source_code_hash = data.aws_s3_bucket_object.lambda1_code.etag
 }
 
 ########################################
 # Lambda 2 (Test VPC)
 ########################################
+data "aws_s3_bucket_object" "lambda2_code" {
+  bucket = "lambda-artifacts-ziad"
+  key    = "lambda/lambda2.zip"
+}
+
 resource "aws_lambda_function" "lambda2_test" {
   function_name = "lambda2-test"
   runtime       = "python3.13"
@@ -76,6 +87,7 @@ resource "aws_lambda_function" "lambda2_test" {
     security_group_ids = [data.terraform_remote_state.vpc.outputs.test_lambda_sg_id]
   }
 
-  filename         = "${path.module}/lambdas/lambda2.zip"
-  source_code_hash = filebase64sha256("${path.module}/lambdas/lambda2.zip")
+  s3_bucket        = data.aws_s3_bucket_object.lambda2_code.bucket
+  s3_key           = data.aws_s3_bucket_object.lambda2_code.key
+  source_code_hash = data.aws_s3_bucket_object.lambda2_code.etag
 }
