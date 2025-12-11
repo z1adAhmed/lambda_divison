@@ -21,6 +21,8 @@ jobs:
         id: changed_files
         run: |
           CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} -- 'scripts/*.py' || true)
+          # Replace newlines with spaces for safe $GITHUB_ENV
+          CHANGED_FILES="${CHANGED_FILES//$'\n'/ }"
           echo "CHANGED_FILES=$CHANGED_FILES" >> $GITHUB_ENV
           echo "Changed files: $CHANGED_FILES"
 
@@ -64,6 +66,7 @@ jobs:
           AWS_REGION: ${{ secrets.AWS_REGION }}
 
       - name: Terraform Apply
+        if: ${{ env.CHANGED_FILES != '' }}
         working-directory: test
         run: terraform apply -auto-approve
         env:
