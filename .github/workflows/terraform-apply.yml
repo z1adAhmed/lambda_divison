@@ -1,8 +1,9 @@
 name: Terraform Apply on Lambda Update
 
 on:
-  repository_dispatch:
-    types: [code-updated]
+  push:
+    branches:
+      - main
 
 jobs:
   terraform:
@@ -11,6 +12,15 @@ jobs:
     steps:
       - name: Checkout infra repo
         uses: actions/checkout@v4
+
+      # 🔵 Zip all Python Lambda scripts from scripts/ directory
+      - name: Zip Lambda scripts
+        run: |
+          mkdir -p test/lambdas
+          for file in scripts/*.py; do
+            fname=$(basename "$file" .py)
+            zip "test/lambdas/${fname}.zip" "$file"
+          done
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
