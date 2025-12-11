@@ -10,18 +10,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 🔹 Checkout with full history for git diff
       - name: Checkout infra repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
-      # 🔹 Zip only changed Python scripts from last commit
       - name: Zip changed Lambda scripts
         id: zip
         run: |
-          mkdir -p test/lambdas
-          # Get list of changed Python files in the last commit
+          mkdir -p zipped
           changed_files=$(git diff --name-only HEAD~1 HEAD | grep '^scripts/.*\.py$' || true)
           if [ -z "$changed_files" ]; then
             echo "No Python scripts changed in last commit."
@@ -29,19 +26,27 @@ jobs:
           else
             for file in $changed_files; do
               fname=$(basename "$file" .py)
-              zip -j "test/lambdas/${fname}.zip" "$file"
+              zip -j "zipped/${fname}.zip" "$file"
               echo "Zipped $file"
             done
             echo "changed=true" >> $GITHUB_OUTPUT
-          fi
 
-      # 🔹 Setup Terraform
+      - name: Upload ZIPs to S3
+        if: steps.zip.outputs.changed == 'true'
+        run: |
+          for zipfile in zipped/*.zip; do
+            aws s3 cp "$zipfile" "s3://lambda-artifacts-ziad/lambda/$(basename $zipfile)"
+          done
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.7.0
 
-      # 🔹 Terraform Init
       - name: Terraform Init
         working-directory: test
         run: terraform init
@@ -50,7 +55,6 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
 
-      # 🔹 Terraform Apply (only if there are changed files)
       - name: Terraform Apply
         if: steps.zip.outputs.changed == 'true'
         working-directory: test
