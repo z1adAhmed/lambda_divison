@@ -5,20 +5,18 @@ on:
     branches:
       - main
     paths:
-      - "scripts/**" # trigger only if scripts change
+      - "scripts/**"
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 🔹 Checkout full history
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 🔹 Get changed Python files in scripts/
       - name: Get changed Python files
         id: changed_files
         run: |
@@ -26,7 +24,6 @@ jobs:
           echo "CHANGED_FILES=$CHANGED_FILES" >> $GITHUB_ENV
           echo "Changed files: $CHANGED_FILES"
 
-      # 🔹 Zip only changed scripts
       - name: Zip changed scripts
         run: |
           mkdir -p zipped
@@ -42,7 +39,6 @@ jobs:
             done
           fi
 
-      # 🔹 Upload ZIPs to S3
       - name: Upload ZIPs to S3
         if: ${{ env.CHANGED_FILES != '' }}
         run: |
@@ -54,13 +50,11 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
 
-      # 🔹 Setup Terraform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.7.0
 
-      # 🔹 Terraform Init
       - name: Terraform Init
         working-directory: test
         run: terraform init
@@ -69,7 +63,6 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
 
-      # 🔹 Terraform Apply
       - name: Terraform Apply
         working-directory: test
         run: terraform apply -auto-approve
