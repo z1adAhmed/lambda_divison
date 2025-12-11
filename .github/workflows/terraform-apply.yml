@@ -13,14 +13,21 @@ jobs:
       - name: Checkout infra repo
         uses: actions/checkout@v4
 
-      # 🔵 Zip all Python Lambda scripts from scripts/ directory
-      - name: Zip Lambda scripts
+      # 🔵 Zip only changed Python scripts from last commit
+      - name: Zip changed Lambda scripts
         run: |
           mkdir -p test/lambdas
-          for file in scripts/*.py; do
-            fname=$(basename "$file" .py)
-            zip "test/lambdas/${fname}.zip" "$file"
-          done
+          # Get list of changed Python files in the last commit
+          changed_files=$(git diff --name-only HEAD~1 HEAD | grep '^scripts/.*\.py$' || true)
+          if [ -z "$changed_files" ]; then
+            echo "No Python scripts changed in last commit."
+          else
+            for file in $changed_files; do
+              fname=$(basename "$file" .py)
+              zip "test/lambdas/${fname}.zip" "$file"
+              echo "Zipped $file"
+            done
+          fi
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
