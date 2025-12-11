@@ -10,29 +10,42 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout infra repo
+      # 🔹 Checkout full history to detect changes
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
-      - name: Zip changed Lambda scripts
-        id: zip
+      # 🔹 Get changed Python files in scripts/
+      - name: Get changed Python files
+        id: get_changed
         run: |
-          mkdir -p zipped
-          changed_files=$(git diff --name-only HEAD~1 HEAD | grep '^scripts/.*\.py$' || true)
-          if [ -z "$changed_files" ]; then
-            echo "No Python scripts changed in last commit."
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep '^scripts/.*\.py$' || true)
+          echo "CHANGED_FILES=$CHANGED_FILES" >> $GITHUB_ENV
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No Python scripts changed."
             echo "changed=false" >> $GITHUB_OUTPUT
           else
-            for file in $changed_files; do
-              fname=$(basename "$file" .py)
-              zip -j "zipped/${fname}.zip" "$file"
-              echo "Zipped $file"
-            done
+            echo "Changed Python scripts:"
+            echo "$CHANGED_FILES"
             echo "changed=true" >> $GITHUB_OUTPUT
 
+      # 🔹 Zip only changed scripts
+      - name: Zip changed scripts
+        if: steps.get_changed.outputs.changed == 'true'
+        run: |
+          mkdir -p zipped
+          for file in $CHANGED_FILES; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file" .py)
+              zip -j "zipped/${filename}.zip" "$file"
+              echo "Zipped $file"
+            fi
+          done
+
+      # 🔹 Upload ZIPs to S3
       - name: Upload ZIPs to S3
-        if: steps.zip.outputs.changed == 'true'
+        if: steps.get_changed.outputs.changed == 'true'
         run: |
           for zipfile in zipped/*.zip; do
             aws s3 cp "$zipfile" "s3://lambda-artifacts-ziad/lambda/$(basename $zipfile)"
@@ -42,11 +55,13 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
 
+      # 🔹 Setup Terraform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.7.0
 
+      # 🔹 Terraform Init
       - name: Terraform Init
         working-directory: test
         run: terraform init
@@ -55,8 +70,9 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
 
+      # 🔹 Terraform Apply (only if there are changed scripts)
       - name: Terraform Apply
-        if: steps.zip.outputs.changed == 'true'
+        if: steps.get_changed.outputs.changed == 'true'
         working-directory: test
         run: terraform apply -auto-approve
         env:
