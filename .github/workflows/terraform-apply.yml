@@ -1,59 +1,50 @@
-name: Terraform Apply on Lambda Update
+name: Upload Lambda & Deploy Terraform
 
 on:
   push:
     branches:
       - main
+    paths:
+      - "scripts/**" # trigger only if scripts change
 
 jobs:
-  terraform:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 🔹 Checkout full history (needed for git diff)
+      # 🔹 Checkout full history
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 🔹 Detect changed Python scripts in scripts/
-      - name: Get changed Python scripts
-        id: get_changed
+      # 🔹 Get changed Python files in scripts/
+      - name: Get changed Python files
+        id: changed_files
         run: |
-          # handle first commit by using empty before SHA
-          BEFORE_SHA=${{ github.event.before }}
-          if [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
-            CHANGED_FILES=$(ls scripts/*.py 2>/dev/null || true)
-          else
-            CHANGED_FILES=$(git diff --name-only $BEFORE_SHA ${{ github.sha }} -- 'scripts/*.py' || true)
-          fi
-
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} -- 'scripts/*.py' || true)
           echo "CHANGED_FILES=$CHANGED_FILES" >> $GITHUB_ENV
+          echo "Changed files: $CHANGED_FILES"
 
-          if [ -z "$CHANGED_FILES" ]; then
-            echo "No Python scripts changed."
-            echo "changed=false" >> $GITHUB_OUTPUT
-          else
-            echo "Changed Python scripts:"
-            echo "$CHANGED_FILES"
-            echo "changed=true" >> $GITHUB_OUTPUT
-
-      # 🔹 Zip only changed scripts (handles spaces in filenames)
+      # 🔹 Zip only changed scripts
       - name: Zip changed scripts
-        if: steps.get_changed.outputs.changed == 'true'
         run: |
           mkdir -p zipped
-          while IFS= read -r file; do
-            if [ -f "$file" ]; then
-              filename=$(basename "$file" .py)
-              zip -j "zipped/${filename}.zip" "$file"
-              echo "Zipped $file"
-            fi
-          done <<< "$CHANGED_FILES"
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No changed Python files to zip."
+          else
+            for file in $CHANGED_FILES; do
+              if [ -f "$file" ]; then
+                filename=$(basename "$file" .py)
+                zip -j "zipped/${filename}.zip" "$file"
+                echo "Zipped $file"
+              fi
+            done
+          fi
 
       # 🔹 Upload ZIPs to S3
       - name: Upload ZIPs to S3
-        if: steps.get_changed.outputs.changed == 'true'
+        if: ${{ env.CHANGED_FILES != '' }}
         run: |
           for zipfile in zipped/*.zip; do
             aws s3 cp "$zipfile" "s3://lambda-artifacts-ziad/lambda/$(basename $zipfile)"
@@ -78,9 +69,8 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
 
-      # 🔹 Terraform Apply (only if there are changed scripts)
+      # 🔹 Terraform Apply
       - name: Terraform Apply
-        if: steps.get_changed.outputs.changed == 'true'
         working-directory: test
         run: terraform apply -auto-approve
         env:
